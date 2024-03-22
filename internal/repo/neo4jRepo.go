@@ -2,9 +2,7 @@ package repo
 
 import (
 	"context"
-	"fmt"
 	"fuzzy_search/internal"
-	"strconv"
 	"strings"
 	"unicode"
 
@@ -72,58 +70,58 @@ func (n *neo4jRepo) Search(ctx context.Context, query string, percentage float64
 
 	// query = fmt.Sprint("\"", query, "\"", "~", 100000) // proximity
 	// fuzzyQuery := fmt.Sprintf("fullTextWithSpaces: %s~%f", query, percentage)
-	percentageStr := strconv.FormatFloat(percentage, 'f', -1, 64)
+	// percentageStr := strconv.FormatFloat(percentage, 'f', -1, 64)
 
-	fuzzyQuery := "fullTextWithSpaces: " + query + "~" + percentageStr
+	// fuzzyQuery := "fullTextWithSpaces: " + query + "~" + percentageStr
 
 	result, err := session.Run(
 		ctx, `
-			CALL db.index.fulltext.queryNodes("product_full_text_index", $query, {analyzer: $analyzer}) YIELD node
-			RETURN node.title AS title, node.description AS description, node.price AS price, node.id AS id
+			CALL db.index.fulltext.queryNodes("product_full_text_index", $query, {analyzer: $analyzer}) YIELD node, score
+			RETURN node.title AS title, node.description AS description, node.price AS price, node.id AS id, score AS score
 		`,
 		map[string]interface{}{
-			"query":    fuzzyQuery,
+			"query":    query,
 			"analyzer": analyzer,
 		},
 	)
 	if err != nil {
 		return nil, err
 	}
-	fuzzyHasResult := false
+	// fuzzyHasResult := false
 
 	products := make([]internal.Product, 0)
 
 	for result.Next(ctx) {
-		fuzzyHasResult = true
+		// fuzzyHasResult = true
 		record := result.Record()
 		product := parseQueryResult(record)
 		products = append(products, product)
 	}
-	wildHasResult := false
-	if !fuzzyHasResult {
-		wildCardQuery := "fullTextWithoutSpaces: " + splitQuery(query, percentage)
-		result, err = session.Run(
-			ctx, `
-					CALL db.index.fulltext.queryNodes("product_full_text_index", $query, {analyzer: $analyzer}) YIELD node
-					RETURN node.title AS title, node.description AS description, node.price AS price, node.id AS id
-				`,
-			map[string]interface{}{
-				"query":    wildCardQuery,
-				"analyzer": analyzer,
-			},
-		)
-		if err != nil {
-			return nil, err
-		}
+	// wildHasResult := false
+	// if !fuzzyHasResult {
+	// 	wildCardQuery := "fullTextWithoutSpaces: " + splitQuery(query, percentage)
+	// 	result, err = session.Run(
+	// 		ctx, `
+	// 				CALL db.index.fulltext.queryNodes("product_full_text_index", $query, {analyzer: $analyzer}) YIELD node
+	// 				RETURN node.title AS title, node.description AS description, node.price AS price, node.id AS id
+	// 			`,
+	// 		map[string]interface{}{
+	// 			"query":    wildCardQuery,
+	// 			"analyzer": analyzer,
+	// 		},
+	// 	)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
 
-		for result.Next(ctx) {
-			wildHasResult = true
-			record := result.Record()
-			product := parseQueryResult(record)
-			products = append(products, product)
-		}
-		fmt.Println("wildHasResult", wildHasResult)
-	}
+	// 	for result.Next(ctx) {
+	// 		wildHasResult = true
+	// 		record := result.Record()
+	// 		product := parseQueryResult(record)
+	// 		products = append(products, product)
+	// 	}
+	// 	fmt.Println("wildHasResult", wildHasResult)
+	// }
 	// if !wildHasResult {
 	// 	orQuery := splitQuery(query, percentage)
 	// 	result, err = session.Run(
@@ -173,6 +171,7 @@ func parseQueryResult(record *db.Record) internal.Product {
 		Title:       productNode[0].(string),
 		Description: productNode[1].(string),
 		Price:       productNode[2].(float64),
+		Score:       productNode[4].(float64),
 	}
 
 	return product

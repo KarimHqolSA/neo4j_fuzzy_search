@@ -9,6 +9,7 @@ type Product struct {
 	Price                 float64
 	FullTextWithSpaces    string
 	FullTextWithoutSpaces string
+	Score                 float64
 }
 
 func (p *Product) CreateIndex() {
